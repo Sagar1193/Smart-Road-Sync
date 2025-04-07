@@ -6,6 +6,13 @@ import pygame
 import sys
 import os
 
+vehicles = {
+    'right': {0: [], 1: [], 2: [], 'crossed': 0},
+    'down': {0: [], 1: [], 2: [], 'crossed': 0},
+    'left': {0: [], 1: [], 2: [], 'crossed': 0},
+    'up': {0: [], 1: [], 2: [], 'crossed': 0}
+}
+
 #to store count of total vehicles after each time unit
 totalVehicles=0
 totalVehiclesLane1=0
@@ -26,9 +33,10 @@ signals = []
 noOfSignals = 4
 simTime = 36000       # change this to change time of simulation
 timeElapsed = 0
+#checked till here
 
 currentGreen = 0   # Indicates which signal is green
-nextGreen = (currentGreen+1)%noOfSignals
+nextGreen = (currentGreen + 1) % noOfSignals
 currentYellow = 0   # Indicates whether yellow signal is on or off 
 
 # Average times for vehicles to pass the intersection
@@ -45,7 +53,7 @@ noOfBuses =0
 noOfTrucks = 0
 noOfRickshaws = 0
 noOfLanes = 2
-
+#2nd check done
 # Red signal time at which cars will be detected at a signal
 detectionTime = 5
 
@@ -58,7 +66,7 @@ y = {'right':[348,370,398], 'down':[0,0,0], 'left':[498,466,436], 'up':[800,800,
 vehicles = {'right': {0:[], 1:[], 2:[], 'crossed':0}, 'down': {0:[], 1:[], 2:[], 'crossed':0}, 'left': {0:[], 1:[], 2:[], 'crossed':0}, 'up': {0:[], 1:[], 2:[], 'crossed':0}}
 vehicleTypes = {0:'car', 1:'bus', 2:'truck', 3:'rickshaw', 4:'bike'}
 directionNumbers = {0:'right', 1:'down', 2:'left', 3:'up'}
-
+#3rd check
 # Coordinates of signal image, timer, and vehicle count
 signalCoods = [(530,230),(810,230),(810,570),(530,570)]
 signalTimerCoods = [(530,210),(810,210),(810,550),(530,550)]
@@ -83,8 +91,20 @@ rotationAngle = 3
 gap = 15    # stopping gap
 gap2 = 15   # moving gap
 
+#4th check
+
 pygame.init()
 simulation = pygame.sprite.Group()
+
+def checkForEmergency():
+    global currentGreen, signals
+    for direction in vehicles:
+        for lane in vehicles[direction]:
+            for vehicle in vehicles[direction][lane]:
+                if vehicle.is_emergency and vehicle.crossed == 0:  # If emergency vehicle is approaching and hasn't crossed
+                    currentGreen = directionNumbers.index(direction)
+                    signals[currentGreen].green = 30  # Set a longer green time for emergency vehicles
+                    return  # Exit after handling the emergency vehicle
 
 class TrafficSignal:
     def __init__(self, red, yellow, green, minimum, maximum):
@@ -99,7 +119,7 @@ class TrafficSignal:
 class Vehicle(pygame.sprite.Sprite):
     global totalCarbonEmission
     global totalWaitingTime
-    def __init__(self, lane, vehicleClass, direction_number, direction, will_turn):
+    def __init__(self, lane, vehicleClass, direction_number, direction, will_turn, is_emergency=False):
         pygame.sprite.Sprite.__init__(self)
         self.lane = lane
         self.vehicleClass = vehicleClass
@@ -113,6 +133,7 @@ class Vehicle(pygame.sprite.Sprite):
         self.turned = 0
         self.rotateAngle = 0
         self.waitingTime=0
+        self.is_emergency = is_emergency  # Assign emergency status here
         vehicles[direction][lane].append(self)
         # self.stop = stops[direction][lane]
         self.index = len(vehicles[direction][lane]) - 1
@@ -158,12 +179,37 @@ class Vehicle(pygame.sprite.Sprite):
             stops[direction][lane] += temp
         simulation.add(self)
 
+
     def render(self, screen):
         screen.blit(self.currentImage, (self.x, self.y))
 
     def move(self):
         global totalCarbonEmission
         global totalWaitingTime
+
+      # If this is an emergency vehicle, it can proceed regardless of the signal
+        if self.is_emergency:
+            if self.direction == 'right':
+                self.x += self.speed
+            elif self.direction == 'down':
+                self.y += self.speed
+            elif self.direction == 'left':
+                self.x -= self.speed
+            elif self.direction == 'up':
+                self.y -= self.speed
+            return  # Skip the rest of the function for emergency vehicles
+
+        # Stop non-emergency vehicles if there's an emergency vehicle in their lane
+        if not self.is_emergency:
+            for lane in vehicles[self.direction]:
+                # Skip 'crossed' key, which is not a list
+                if lane == 'crossed':
+                    continue
+                for vehicle in vehicles[self.direction][lane]:
+                    if vehicle.is_emergency and vehicle.crossed == 0:
+                        self.speed = 0  # Non-emergency vehicles stop
+                        return
+                    
         if(self.direction=='right'):
             if(self.crossed==0 and self.x+self.currentImage.get_rect().width>stopLines[self.direction]):   # if the image has crossed stop line now
                 self.crossed = 1
@@ -407,6 +453,7 @@ def setTime():
         totalVehiclesLane4+=noOfCars+noOfRickshaws+noOfBuses+noOfTrucks+noOfBikes
     
     signals[(currentGreen+1)%(noOfSignals)].green = greenTime
+
    
 def repeat():
     global currentGreen, currentYellow, nextGreen
@@ -419,6 +466,7 @@ def repeat():
             thread.start()
             # setTime()
         time.sleep(1)
+        checkForEmergency()  # Check if there's an emergency vehicle approaching
     currentYellow = 1   # set yellow signal on
     vehicleCountTexts[currentGreen] = "0"
     # reset stop coordinates of lanes and vehicles 
@@ -467,33 +515,78 @@ def updateValues():
             signals[i].red-=1
 
 # Generating vehicles in the simulation
+
 def generateVehicles():
-    while(True):
-        vehicle_type = random.randint(0,4)
-        if(vehicle_type==4):
+    # Define the probability for a vehicle to be an emergency vehicle (e.g., 10%)
+    emergency_probability = 0.1
+
+    while True:
+        vehicle_type = random.randint(0, 4)
+        if vehicle_type == 4:
             lane_number = 0
         else:
-            lane_number = random.randint(0,1) + 1
+            lane_number = random.randint(0, 1) + 1
         will_turn = 0
-        if(lane_number==2):
-            temp = random.randint(0,4)
-            if(temp<=2):
+        if lane_number == 2:
+            temp = random.randint(0, 4)
+            if temp <= 2:
                 will_turn = 1
-            elif(temp>2):
+            elif temp > 2:
                 will_turn = 0
-        temp = random.randint(0,999)
+        temp = random.randint(0, 999)
         direction_number = 0
-        a = [400,800,900,1000]
-        if(temp<a[0]):
+        a = [400, 800, 900, 1000]
+        if temp < a[0]:
             direction_number = 0
-        elif(temp<a[1]):
+        elif temp < a[1]:
             direction_number = 1
-        elif(temp<a[2]):
+        elif temp < a[2]:
             direction_number = 2
-        elif(temp<a[3]):
+        elif temp < a[3]:
             direction_number = 3
-        Vehicle(lane_number, vehicleTypes[vehicle_type], direction_number, directionNumbers[direction_number], will_turn)
+
+        # Decide if this vehicle is an emergency vehicle based on the probability
+        is_emergency = random.random() < emergency_probability
+
+        # Create the vehicle with the determined emergency status
+        Vehicle(lane_number, vehicleTypes[vehicle_type], direction_number, directionNumbers[direction_number], will_turn, is_emergency=is_emergency)
+        
+        # Log to the console if an emergency vehicle is created
+        if is_emergency:
+            print(f"Emergency vehicle created in direction: {directionNumbers[direction_number]}, lane: {lane_number}")
+
+        # Wait before generating the next vehicle
         time.sleep(0.75)
+
+# def generateVehicles():
+#     while(True):
+#         vehicle_type = random.randint(0,4)
+#         if(vehicle_type==4):
+#             lane_number = 0
+#         else:
+#             lane_number = random.randint(0,1) + 1
+#         will_turn = 0
+#         if(lane_number==2):
+#             temp = random.randint(0,4)
+#             if(temp<=2):
+#                 will_turn = 1
+#             elif(temp>2):
+#                 will_turn = 0
+#         temp = random.randint(0,999)
+#         direction_number = 0
+#         a = [400,800,900,1000]
+#         if(temp<a[0]):
+#             direction_number = 0
+#         elif(temp<a[1]):
+#             direction_number = 1
+#         elif(temp<a[2]):
+#             direction_number = 2
+#         elif(temp<a[3]):
+#             direction_number = 3
+#         # Randomly decide if a vehicle is an emergency vehicle (adjust the probability as needed)
+#         is_emergency = random.choice([True, False])  # Example: 50% chance to be emergency
+#         Vehicle(lane_number, vehicleTypes[vehicle_type], direction_number, directionNumbers[direction_number], will_turn)
+#         time.sleep(0.75)
 
 def simulationTime():
     global timeElapsed, simTime
@@ -607,5 +700,7 @@ class Main:
             vehicle.move()
         pygame.display.update()
 
+
 Main()
-  
+
+   

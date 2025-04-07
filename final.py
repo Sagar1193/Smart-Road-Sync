@@ -9,18 +9,46 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-df=pd.read_csv("data_new.csv",names=["right","down","left","up","total_passed","avg_wt_time"])
+# df=pd.read_csv(r"C:\Users\user\Documents\Khushi\V2I-Simulator\data_new.csv",names=["right","down","left","up","total_passed","avg_wt_time"])
 
-right=np.array(df['right']).reshape(-1, 1)
-down=np.array(df['down']).reshape(-1, 1)
-left=np.array(df['left']).reshape(-1, 1)
-up=np.array(df['up']).reshape(-1, 1)
-x=np.array(np.arange(0,90,1)).reshape(-1, 1)
+# right=np.array(df['right']).reshape(-1, 1)
+# down=np.array(df['down']).reshape(-1, 1)
+# left=np.array(df['left']).reshape(-1, 1)
+# up=np.array(df['up']).reshape(-1, 1)
+# x=np.array(np.arange(0,90,1)).reshape(-1, 1)
 
+# right_model = LinearRegression().fit(x, right)
+# down_model = LinearRegression().fit(x, down)
+# left_model = LinearRegression().fit(x, left)
+# up_model = LinearRegression().fit(x, up)
+
+# Read CSV and skip the header row if necessary
+df = pd.read_csv(r"C:\Users\sagar\OneDrive\Desktop\Khushi\Khushi\V2I-Simulator\data_new.csv", skiprows=1, names=["right", "down", "left", "up", "total_passed", "avg_wt_time"])
+
+# Convert columns to numeric and handle non-numeric values
+df['right'] = pd.to_numeric(df['right'], errors='coerce')
+df['down'] = pd.to_numeric(df['down'], errors='coerce')
+df['left'] = pd.to_numeric(df['left'], errors='coerce')
+df['up'] = pd.to_numeric(df['up'], errors='coerce')
+
+# Drop rows with NaN values (caused by non-numeric data)
+df = df.dropna()
+
+right = np.array(df['right']).reshape(-1, 1)
+down = np.array(df['down']).reshape(-1, 1)
+left = np.array(df['left']).reshape(-1, 1)
+up = np.array(df['up']).reshape(-1, 1)
+
+x = np.array(np.arange(0, len(right))).reshape(-1, 1)  # Ensure x matches the length of the data
+
+# Proceed with training the models
 right_model = LinearRegression().fit(x, right)
 down_model = LinearRegression().fit(x, down)
 left_model = LinearRegression().fit(x, left)
 up_model = LinearRegression().fit(x, up)
+
+print("Models trained successfully")
+
 
 last_data=[0,0,0,0]
 itern=0

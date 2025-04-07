@@ -9,22 +9,52 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 
-df=pd.read_csv("data_new.csv",names=["right","down","left","up","total_passed","avg_wt_time"])
+# df=pd.read_csv("data_new.csv",names=["right","down","left","up","total_passed","avg_wt_time"])
 
-right=np.array(df['right']).reshape(-1, 1)
-down=np.array(df['down']).reshape(-1, 1)
-left=np.array(df['left']).reshape(-1, 1)
-up=np.array(df['up']).reshape(-1, 1)
-x=np.array(np.arange(0,90,1)).reshape(-1, 1)
+# right=np.array(df['right']).reshape(-1, 1)
+# down=np.array(df['down']).reshape(-1, 1)
+# left=np.array(df['left']).reshape(-1, 1)
+# up=np.array(df['up']).reshape(-1, 1)
+# x=np.array(np.arange(0,90,1)).reshape(-1, 1)
 
+# right_model = LinearRegression().fit(x, right)
+# down_model = LinearRegression().fit(x, down)
+# left_model = LinearRegression().fit(x, left)
+# up_model = LinearRegression().fit(x, up)
+
+# Read CSV and ensure only numeric data is loaded
+df = pd.read_csv("data_new.csv", names=["right", "down", "left", "up", "total_passed", "avg_wt_time"])
+
+# Convert columns to numeric and handle any non-numeric data by coercing them to NaN
+df['right'] = pd.to_numeric(df['right'], errors='coerce')
+df['down'] = pd.to_numeric(df['down'], errors='coerce')
+df['left'] = pd.to_numeric(df['left'], errors='coerce')
+df['up'] = pd.to_numeric(df['up'], errors='coerce')
+
+# Drop rows with NaN values to clean the data
+df = df.dropna()
+
+# Check if the DataFrame is now clean
+print(df.head())
+
+# Convert the columns to numpy arrays for regression
+right = np.array(df['right']).reshape(-1, 1)
+down = np.array(df['down']).reshape(-1, 1)
+left = np.array(df['left']).reshape(-1, 1)
+up = np.array(df['up']).reshape(-1, 1)
+x = np.array(np.arange(0, len(right))).reshape(-1, 1)  # Adjust length based on cleaned data
+
+# Train the models
 right_model = LinearRegression().fit(x, right)
 down_model = LinearRegression().fit(x, down)
 left_model = LinearRegression().fit(x, left)
 up_model = LinearRegression().fit(x, up)
 
-last_data=[-1,-1,-1,-1]
+print("Models trained successfully")
 
 
+last_data=[0,0,0,0]
+itern=0
 
 #to store count of total vehicles after each time unit
 totalVehicles=0
@@ -342,7 +372,8 @@ def initialize():
 
 # Set time according to formula
 def setTime():
-    global greenTime1,greenTime2,greenTime3,greenTime4
+    global right_model,left_model,up_model,down_model,itern
+    global greenTime1,greenTime2,greenTime3,greenTime4,last_data
     global totalCarbonEmission,totalWaitingTime , vehicles
     global noOfCars, noOfBikes, noOfBuses, noOfTrucks, noOfRickshaws, noOfLanes
     global carTime, busTime, truckTime, rickshawTime, bikeTime
@@ -377,10 +408,10 @@ def setTime():
     direction=directionNumbers[(currentGreen)%noOfSignals]
     
     if direction=="right":
-        totalVehiclesLane1=len(vehicles['right'][0])+len(vehicles['right'][1])+len(vehicles['right'][2])
-        totalVehiclesLane2=len(vehicles['down'][0])+len(vehicles['down'][1])+len(vehicles['down'][2])
-        totalVehiclesLane3=len(vehicles['left'][0])+len(vehicles['left'][1])+len(vehicles['left'][2])
-        totalVehiclesLane4=len(vehicles['up'][0])+len(vehicles['up'][1])+len(vehicles['up'][2])
+        last_data[0]=totalVehiclesLane1=right_model.predict(np.array([itern]).reshape(-1,1))[0][0]-last[0]
+        last_data[1]=totalVehiclesLane2=down_model.predict(np.array([itern]).reshape(-1,1))[0][0]-last[1]
+        last_data[2]=totalVehiclesLane3=left_model.predict(np.array([itern]).reshape(-1,1))[0][0]-last[2]
+        last_data[3]=totalVehiclesLane4=right_model.predict(np.array([itern]).reshape(-1,1))[0][0]-last[3]
         totalVehiclesNow=totalVehiclesLane1+totalVehiclesLane2+totalVehiclesLane3+totalVehiclesLane4
 
         greenTime1=math.ceil(oneTimeUnit*totalVehiclesLane1/totalVehiclesNow)
@@ -415,7 +446,7 @@ def setTime():
     #     file=open('data_new.csv','a') #This is the file in which I will be storing all details
     #     file.write(str(totalVehiclesLane1)+','+str(totalVehiclesLane2)+','+str(totalVehiclesLane3)+','+str(totalVehiclesLane4)+','+str(totalVehiclesNow)+','+str(avg_waiting)+'\n')
     #     file.close()
-    
+    itern+=1
     signals[(currentGreen+1)%(noOfSignals)].green = max(5,greenTime)
    
 def repeat():
@@ -618,4 +649,3 @@ class Main:
         pygame.display.update()
 
 Main()
-  
